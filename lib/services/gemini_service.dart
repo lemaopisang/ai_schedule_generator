@@ -1,9 +1,24 @@
 import 'dart:convert'; // Untuk encode/decode JSON
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:http/http.dart' as http;
 
 class GeminiService {
-  // API Key - GANTI dengan milikmu (jangan hardcode di production!)
-  static const String apiKey = 'AIzaSyDYZV01UaqVT1_eifcuH718AulBoZjy5ls';
+  // API key is loaded from .env (preferred) but falls back to --dart-define.
+  static const String _envVarName = 'GEMINI_API_KEY';
+
+  static String get _apiKey {
+    final fromDotEnv = dotenv.env[_envVarName]?.trim();
+    if (fromDotEnv?.isNotEmpty == true) {
+      return fromDotEnv!;
+    }
+    const fromDartDefine = String.fromEnvironment(_envVarName);
+    if (fromDartDefine.isNotEmpty) {
+      return fromDartDefine;
+    }
+    throw StateError(
+      '$_envVarName is missing. Define it in .env or pass it using --dart-define.',
+    );
+  }
 
   // Gunakan model terbaru sesuai kebutuhan (example: gemini-3-flash-preview)
   static const String model = 'gemini-3-flash-preview';
@@ -17,7 +32,7 @@ class GeminiService {
   ) async {
     try {
       final prompt = _buildPrompt(tasks);
-      final url = Uri.parse('$baseUrl?key=$apiKey');
+      final url = Uri.parse('$baseUrl?key=${_apiKey}');
 
       final requestBody = {
         'contents': [

@@ -142,6 +142,14 @@ packages:
     description: flutter
     source: sdk
     version: "0.0.0"
+  flutter_dotenv:
+    dependency: "direct main"
+    description:
+      name: flutter_dotenv
+      sha256: b7c7be5cd9f6ef7a78429cabd2774d3c4af50e79cb2b7593e3d5d763ef95c61b
+      url: "https://pub.dev"
+    source: hosted
+    version: "5.2.1"
   flutter_lints:
     dependency: "direct dev"
     description:
@@ -233,10 +241,10 @@ packages:
     dependency: transitive
     description:
       name: google_sign_in_web
-      sha256: e2658572e07811e687d6ffd5d30122377d6df69c21e7828711ce48c3aa38dcb0
+      sha256: dac0676af14b96b11691cc3c3e152415a896a38f1224269241d7cc294bdb9102
       url: "https://pub.dev"
     source: hosted
-    version: "1.1.1"
+    version: "1.1.2"
   googleapis:
     dependency: "direct main"
     description:
@@ -425,10 +433,10 @@ packages:
     dependency: transitive
     description:
       name: shared_preferences_android
-      sha256: cbc40be9be1c5af4dab4d6e0de4d5d3729e6f3d65b89d21e1815d57705644a6f
+      sha256: "8374d6200ab33ac99031a852eba4c8eb2170c4bf20778b3e2c9eccb45384fb41"
       url: "https://pub.dev"
     source: hosted
-    version: "2.4.20"
+    version: "2.4.21"
   shared_preferences_foundation:
     dependency: transitive
     description:
