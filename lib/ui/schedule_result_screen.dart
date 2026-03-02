@@ -2,9 +2,91 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart'; // Untuk fitur copy ke clipboard
 import 'package:flutter_markdown/flutter_markdown.dart'; // Untuk render Markdown
 
-class ScheduleResultScreen extends StatelessWidget {
+import '../services/calendar_service.dart';
+import '../services/schedule_parser.dart';
+
+class ScheduleResultScreen extends StatefulWidget {
   final String scheduleResult; // Data hasil dari AI
   const ScheduleResultScreen({super.key, required this.scheduleResult});
+
+  @override
+  State<ScheduleResultScreen> createState() => _ScheduleResultScreenState();
+}
+
+class _ScheduleResultScreenState extends State<ScheduleResultScreen> {
+  final CalendarService _calendarService = CalendarService();
+  bool _isExporting = false;
+
+  Future<DateTime?> _pickDateTime(BuildContext context) async {
+    final now = DateTime.now();
+    final pickedDate = await showDatePicker(
+      context: context,
+      initialDate: now,
+      firstDate: DateTime(now.year - 1),
+      lastDate: DateTime(now.year + 3),
+    );
+
+    if (pickedDate == null || !context.mounted) return null;
+
+    final pickedTime = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay.fromDateTime(now),
+    );
+
+    if (pickedTime == null) return null;
+
+    return DateTime(
+      pickedDate.year,
+      pickedDate.month,
+      pickedDate.day,
+      pickedTime.hour,
+      pickedTime.minute,
+    );
+  }
+
+  Future<void> _exportToCalendar() async {
+    final anchor = await _pickDateTime(context);
+    if (anchor == null) return;
+
+    final events = ScheduleParser.parseMarkdownSchedule(
+      widget.scheduleResult,
+      anchor,
+    );
+    if (events.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Format jadwal belum berisi rentang waktu yang bisa diekspor.',
+          ),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    setState(() => _isExporting = true);
+    try {
+      await _calendarService.addParsedEventsToCalendar(events);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            '${events.length} event berhasil ditambahkan ke Google Calendar.',
+          ),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Export gagal: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _isExporting = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -15,11 +97,25 @@ class ScheduleResultScreen extends StatelessWidget {
         title: const Text("Hasil Jadwal Optimal"),
         actions: [
           IconButton(
+            icon: _isExporting
+                ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Colors.white,
+                    ),
+                  )
+                : const Icon(Icons.calendar_month),
+            tooltip: "Export ke Google Calendar",
+            onPressed: _isExporting ? null : _exportToCalendar,
+          ),
+          IconButton(
             icon: const Icon(Icons.copy),
             tooltip: "Salin Jadwal",
             onPressed: () {
               // Menyalin seluruh hasil ke clipboard
-              Clipboard.setData(ClipboardData(text: scheduleResult));
+              Clipboard.setData(ClipboardData(text: widget.scheduleResult));
               // Notifikasi kecil ke user
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(content: Text("Jadwal berhasil disalin!")),
@@ -35,7 +131,10 @@ class ScheduleResultScreen extends StatelessWidget {
             children: [
               // HEADER INFORMASI
               Container(
-                padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 15),
+                padding: const EdgeInsets.symmetric(
+                  vertical: 10,
+                  horizontal: 15,
+                ),
                 decoration: BoxDecoration(
                   color: Colors.indigo.shade50,
                   borderRadius: BorderRadius.circular(8),
@@ -73,18 +172,36 @@ class ScheduleResultScreen extends StatelessWidget {
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(12),
                     child: Markdown(
-                      data: scheduleResult, // Data dari AI
+                      data: widget.scheduleResult, // Data dari AI
                       selectable: true, // Bisa copy sebagian teks
                       padding: const EdgeInsets.all(20),
                       // Styling agar tampilan lebih profesional
                       styleSheet: MarkdownStyleSheet(
-                        p: const TextStyle(fontSize: 15, height: 1.6, color: Colors.black87),
+                        p: const TextStyle(
+                          fontSize: 15,
+                          height: 1.6,
+                          color: Colors.black87,
+                        ),
                         // Styling heading
-                        h1: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.indigo),
-                        h2: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                        h3: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600, color: Colors.indigoAccent),
+                        h1: const TextStyle(
+                          fontSize: 24,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.indigo,
+                        ),
+                        h2: const TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                        ),
+                        h3: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.indigoAccent,
+                        ),
                         // Styling tabel
-                        tableBorder: TableBorder.all(color: Colors.grey, width: 1),
+                        tableBorder: TableBorder.all(
+                          color: Colors.grey,
+                          width: 1,
+                        ),
                         tableHeadAlign: TextAlign.center,
                         tablePadding: const EdgeInsets.all(8),
                       ),

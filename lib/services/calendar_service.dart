@@ -2,6 +2,8 @@ import 'package:google_sign_in/google_sign_in.dart' as gsi;
 import 'package:googleapis/calendar/v3.dart' as calendar;
 import 'package:http/http.dart' as http;
 
+import 'schedule_parser.dart';
+
 /// Custom HTTP client that injects the Google access token for calendar calls.
 class _GoogleAuthClient extends http.BaseClient {
   final Map<String, String> _headers;
@@ -20,7 +22,9 @@ class CalendarService {
   final gsi.GoogleSignIn _googleSignIn = gsi.GoogleSignIn.instance;
   static bool _isInitialized = false;
 
-  static const List<String> _calendarScopes = [calendar.CalendarApi.calendarScope];
+  static const List<String> _calendarScopes = [
+    calendar.CalendarApi.calendarScope,
+  ];
 
   Future<void> _ensureInitialized() async {
     if (!_isInitialized) {
@@ -47,18 +51,23 @@ class CalendarService {
       rethrow;
     }
 
-    final auth = await account.authorizationClient.authorizeScopes(_calendarScopes);
+    final auth = await account.authorizationClient.authorizeScopes(
+      _calendarScopes,
+    );
     final token = auth.accessToken;
 
-    final client = _GoogleAuthClient(
-      http.Client(),
-      {'Authorization': 'Bearer $token'},
-    );
+    final client = _GoogleAuthClient(http.Client(), {
+      'Authorization': 'Bearer $token',
+    });
 
     final calendarApi = calendar.CalendarApi(client);
 
     final sortedTasks = List<Map<String, dynamic>>.from(tasks)
-      ..sort((a, b) => _priorityOrder(a['priority']).compareTo(_priorityOrder(b['priority'])));
+      ..sort(
+        (a, b) => _priorityOrder(
+          a['priority'],
+        ).compareTo(_priorityOrder(b['priority'])),
+      );
 
     var slot = _nextMorningSlot();
     for (final task in sortedTasks) {
@@ -79,6 +88,56 @@ class CalendarService {
 
       await calendarApi.events.insert(event, 'primary');
       slot = slot.add(duration + const Duration(minutes: 10));
+    }
+
+    client.close();
+  }
+
+  Future<void> addParsedEventsToCalendar(
+    List<ScheduleCalendarEvent> events,
+  ) async {
+    if (events.isEmpty) {
+      throw Exception('Tidak ada event yang bisa diekspor ke Google Calendar.');
+    }
+
+    await _ensureInitialized();
+
+    final gsi.GoogleSignInAccount account;
+    try {
+      account = await _googleSignIn.authenticate();
+    } on gsi.GoogleSignInException catch (e) {
+      if (e.code == gsi.GoogleSignInExceptionCode.canceled) {
+        throw Exception('Google Sign-In dibatalkan.');
+      }
+      rethrow;
+    }
+
+    final auth = await account.authorizationClient.authorizeScopes(
+      _calendarScopes,
+    );
+    final token = auth.accessToken;
+
+    final client = _GoogleAuthClient(http.Client(), {
+      'Authorization': 'Bearer $token',
+    });
+
+    final calendarApi = calendar.CalendarApi(client);
+
+    for (final item in events) {
+      final event = calendar.Event(
+        summary: item.title,
+        description: 'Dibuat oleh AI Schedule Generator',
+        start: calendar.EventDateTime(
+          dateTime: item.start,
+          timeZone: item.start.timeZoneName,
+        ),
+        end: calendar.EventDateTime(
+          dateTime: item.end,
+          timeZone: item.end.timeZoneName,
+        ),
+      );
+
+      await calendarApi.events.insert(event, 'primary');
     }
 
     client.close();
