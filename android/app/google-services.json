@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "852488577279",
+    "project_id": "ai-schedule-generator-7b256",
+    "storage_bucket": "ai-schedule-generator-7b256.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:852488577279:android:09c5f695d12bf21814ecca",
+        "android_client_info": {
+          "package_name": "com.example.ai_schedule_generator"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDgygKzszRC035TzaC9w3LNyZws9Go9wp0"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
