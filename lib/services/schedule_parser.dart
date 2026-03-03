@@ -12,7 +12,8 @@ class ScheduleCalendarEvent {
 
 class ScheduleParser {
   static final RegExp _timeRangeRegex = RegExp(
-    r'(?i)(\d{1,2})(?::(\d{2}))?\s*(AM|PM)?\s*[-–—]\s*(\d{1,2})(?::(\d{2}))?\s*(AM|PM)?',
+    r'(\d{1,2})(?::(\d{2}))?\s*(AM|PM)?\s*(?:-|–|—)\s*(\d{1,2})(?::(\d{2}))?\s*(AM|PM)?',
+    caseSensitive: false,
   );
 
   static List<ScheduleCalendarEvent> parseMarkdownSchedule(

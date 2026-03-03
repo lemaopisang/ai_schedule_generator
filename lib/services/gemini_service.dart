@@ -32,7 +32,7 @@ class GeminiService {
   ) async {
     try {
       final prompt = _buildPrompt(tasks);
-      final url = Uri.parse('$baseUrl?key=${_apiKey}');
+      final url = Uri.parse('$baseUrl?key=$_apiKey');
 
       final requestBody = {
         'contents': [

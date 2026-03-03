@@ -1,66 +1,11 @@
-import 'package:google_sign_in/google_sign_in.dart' as gsi;
-import 'package:googleapis/calendar/v3.dart' as calendar;
-import 'package:http/http.dart' as http;
-
 import 'schedule_parser.dart';
 
-/// Custom HTTP client that injects the Google access token for calendar calls.
-class _GoogleAuthClient extends http.BaseClient {
-  final Map<String, String> _headers;
-  final http.Client _inner;
-
-  _GoogleAuthClient(this._inner, this._headers);
-
-  @override
-  Future<http.StreamedResponse> send(http.BaseRequest request) {
-    request.headers.addAll(_headers);
-    return _inner.send(request);
-  }
-}
-
 class CalendarService {
-  final gsi.GoogleSignIn _googleSignIn = gsi.GoogleSignIn.instance;
-  static bool _isInitialized = false;
-
-  static const List<String> _calendarScopes = [
-    calendar.CalendarApi.calendarScope,
-  ];
-
-  Future<void> _ensureInitialized() async {
-    if (!_isInitialized) {
-      await _googleSignIn.initialize();
-      _isInitialized = true;
-    }
-  }
-
-  /// Insert each task as an event on the user's primary calendar.
-  Future<void> addTasksToCalendar(List<Map<String, dynamic>> tasks) async {
+  /// Build one Google Calendar link from all tasks as a summary event.
+  String buildTaskSummaryLink(List<Map<String, dynamic>> tasks) {
     if (tasks.isEmpty) {
-      throw Exception('Tidak ada tugas untuk ditambahkan ke Google Calendar.');
+      throw Exception('Tidak ada tugas untuk dibuatkan link Google Calendar.');
     }
-
-    await _ensureInitialized();
-
-    final gsi.GoogleSignInAccount account;
-    try {
-      account = await _googleSignIn.authenticate();
-    } on gsi.GoogleSignInException catch (e) {
-      if (e.code == gsi.GoogleSignInExceptionCode.canceled) {
-        throw Exception('Google Sign-In dibatalkan.');
-      }
-      rethrow;
-    }
-
-    final auth = await account.authorizationClient.authorizeScopes(
-      _calendarScopes,
-    );
-    final token = auth.accessToken;
-
-    final client = _GoogleAuthClient(http.Client(), {
-      'Authorization': 'Bearer $token',
-    });
-
-    final calendarApi = calendar.CalendarApi(client);
 
     final sortedTasks = List<Map<String, dynamic>>.from(tasks)
       ..sort(
@@ -70,77 +15,91 @@ class CalendarService {
       );
 
     var slot = _nextMorningSlot();
+    DateTime? firstStart;
+    DateTime? lastEnd;
+    final detailLines = <String>[];
+
     for (final task in sortedTasks) {
       final duration = Duration(minutes: task['duration'] as int);
-      final event = calendar.Event(
-        summary: '${task['name']} • Prioritas ${task['priority']}',
-        description:
-            'Durasi ${task['duration']} menit · Dibuat oleh AI Schedule Generator',
-        start: calendar.EventDateTime(
-          dateTime: slot,
-          timeZone: slot.timeZoneName,
-        ),
-        end: calendar.EventDateTime(
-          dateTime: slot.add(duration),
-          timeZone: slot.timeZoneName,
-        ),
+      final end = slot.add(duration);
+      firstStart ??= slot;
+      lastEnd = end;
+
+      detailLines.add(
+        '${_displayTime(slot)} - ${_displayTime(end)} | ${task['name']} (${task['duration']} menit, ${task['priority']})',
       );
 
-      await calendarApi.events.insert(event, 'primary');
       slot = slot.add(duration + const Duration(minutes: 10));
     }
 
-    client.close();
+    return _buildGoogleCalendarUrl(
+      title: 'AI Schedule Summary',
+      details:
+          'Ringkasan tugas dari AI Schedule Generator\n\n${detailLines.join('\n')}',
+      start: firstStart!,
+      end: lastEnd!,
+    );
   }
 
-  Future<void> addParsedEventsToCalendar(
+  /// Build one Google Calendar link from parsed schedule events.
+  String buildParsedEventsSummaryLink(
     List<ScheduleCalendarEvent> events,
-  ) async {
+  ) {
     if (events.isEmpty) {
-      throw Exception('Tidak ada event yang bisa diekspor ke Google Calendar.');
+      throw Exception('Tidak ada event yang bisa dibuatkan link Google Calendar.');
     }
 
-    await _ensureInitialized();
+    final sorted = List<ScheduleCalendarEvent>.from(events)
+      ..sort((a, b) => a.start.compareTo(b.start));
 
-    final gsi.GoogleSignInAccount account;
-    try {
-      account = await _googleSignIn.authenticate();
-    } on gsi.GoogleSignInException catch (e) {
-      if (e.code == gsi.GoogleSignInExceptionCode.canceled) {
-        throw Exception('Google Sign-In dibatalkan.');
-      }
-      rethrow;
-    }
+    final detailLines = sorted
+        .map(
+          (item) =>
+              '${_displayTime(item.start)} - ${_displayTime(item.end)} | ${item.title}',
+        )
+        .toList();
 
-    final auth = await account.authorizationClient.authorizeScopes(
-      _calendarScopes,
+    return _buildGoogleCalendarUrl(
+      title: 'AI Schedule Summary',
+      details:
+          'Ringkasan jadwal hasil AI Schedule Generator\n\n${detailLines.join('\n')}',
+      start: sorted.first.start,
+      end: sorted.last.end,
     );
-    final token = auth.accessToken;
+  }
 
-    final client = _GoogleAuthClient(http.Client(), {
-      'Authorization': 'Bearer $token',
-    });
+  String _buildGoogleCalendarUrl({
+    required String title,
+    required String details,
+    required DateTime start,
+    required DateTime end,
+  }) {
+    final params = {
+      'action': 'TEMPLATE',
+      'text': title,
+      'details': details,
+      'dates': '${_formatCalendarDate(start)}/${_formatCalendarDate(end)}',
+    };
 
-    final calendarApi = calendar.CalendarApi(client);
+    return Uri.https('calendar.google.com', '/calendar/render', params)
+        .toString();
+  }
 
-    for (final item in events) {
-      final event = calendar.Event(
-        summary: item.title,
-        description: 'Dibuat oleh AI Schedule Generator',
-        start: calendar.EventDateTime(
-          dateTime: item.start,
-          timeZone: item.start.timeZoneName,
-        ),
-        end: calendar.EventDateTime(
-          dateTime: item.end,
-          timeZone: item.end.timeZoneName,
-        ),
-      );
+  String _formatCalendarDate(DateTime dateTime) {
+    final utc = dateTime.toUtc();
+    final year = utc.year.toString().padLeft(4, '0');
+    final month = utc.month.toString().padLeft(2, '0');
+    final day = utc.day.toString().padLeft(2, '0');
+    final hour = utc.hour.toString().padLeft(2, '0');
+    final minute = utc.minute.toString().padLeft(2, '0');
+    final second = utc.second.toString().padLeft(2, '0');
+    return '$year$month$day' 'T$hour$minute$second' 'Z';
+  }
 
-      await calendarApi.events.insert(event, 'primary');
-    }
-
-    client.close();
+  String _displayTime(DateTime dateTime) {
+    final hour = dateTime.hour.toString().padLeft(2, '0');
+    final minute = dateTime.minute.toString().padLeft(2, '0');
+    return '$hour:$minute';
   }
 
   int _priorityOrder(String priority) {

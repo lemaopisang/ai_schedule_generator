@@ -38,13 +38,7 @@ dependencies:
   # Menampilkan teks dalam format Markdown
   flutter_markdown: ^0.7.1
   # Load environment variables from .env
-  flutter_dotenv: ^5.0.3
-  # Akses berbagai layanan Google API
-  googleapis: ^16.0.0
-  # Autentikasi ke layanan Google (OAuth, service account, dll)
-  googleapis_auth: ^2.0.0
-  # Google Sign-in untuk akses Calendar API
-  google_sign_in: ^7.2.0
+  flutter_dotenv: ^6.0.0
   # Firebase core
   firebase_core: ^4.4.0
   # Gemini AI API
@@ -77,8 +71,7 @@ flutter:
   uses-material-design: true
 
   # To add assets to your application, add an assets section, like this:
-  assets:
-    - .env
+  assets: []
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images

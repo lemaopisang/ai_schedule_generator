@@ -1,20 +1,39 @@
-# ai_schedule_generator
+# AI Schedule Generator
 
-A new Flutter project.
+Aplikasi Flutter untuk membuat jadwal harian dari daftar tugas menggunakan Gemini API.
 
-## Getting Started
+## Setup
 
-This project is a starting point for a Flutter application.
+1. Buat/isi file `.env` di root project:
 
-A few resources to get you started if this is your first Flutter project:
+	`GEMINI_API_KEY=YOUR_GEMINI_API_KEY`
 
-- [Learn Flutter](https://docs.flutter.dev/get-started/learn-flutter)
-- [Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Flutter learning resources](https://docs.flutter.dev/reference/learning-resources)
+2. Jalankan dependency:
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+	`flutter pub get`
+
+3. Jalankan aplikasi:
+
+	`flutter run`
+
+## Fitur Utama
+
+- Tambah/hapus tugas dengan durasi dan prioritas.
+- Generate jadwal AI dalam format Markdown.
+- Copy hasil jadwal ke clipboard.
+- Export ke Google Calendar via link (bukan OAuth/API Calendar).
+
+## Export Google Calendar (Link)
+
+- Dari halaman hasil jadwal, tekan ikon kalender.
+- Pilih tanggal & jam anchor.
+- Aplikasi membuat satu link Google Calendar berisi event ringkasan jadwal.
+- Link muncul di halaman hasil dan bisa di-copy.
+
+## Catatan Keamanan
+
+- Jangan commit `.env` ke repository.
+- API key di client app tetap bisa terekspos pada build production; untuk production, gunakan backend proxy.
 
 ## Legal
 

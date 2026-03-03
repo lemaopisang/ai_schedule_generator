@@ -51,3 +51,6 @@ android/local.properties
 # iOS Flutter artifacts
 ios/Flutter/flutter_export_environment.sh
 ios/Pods/
+
+# Local secrets
+.env

@@ -16,6 +16,7 @@ class ScheduleResultScreen extends StatefulWidget {
 class _ScheduleResultScreenState extends State<ScheduleResultScreen> {
   final CalendarService _calendarService = CalendarService();
   bool _isExporting = false;
+  String? _calendarExportLink;
 
   Future<DateTime?> _pickDateTime(BuildContext context) async {
     final now = DateTime.now();
@@ -46,6 +47,7 @@ class _ScheduleResultScreenState extends State<ScheduleResultScreen> {
 
   Future<void> _exportToCalendar() async {
     final anchor = await _pickDateTime(context);
+    if (!mounted) return;
     if (anchor == null) return;
 
     final events = ScheduleParser.parseMarkdownSchedule(
@@ -66,14 +68,11 @@ class _ScheduleResultScreenState extends State<ScheduleResultScreen> {
 
     setState(() => _isExporting = true);
     try {
-      await _calendarService.addParsedEventsToCalendar(events);
+      final link = _calendarService.buildParsedEventsSummaryLink(events);
       if (!mounted) return;
+      setState(() => _calendarExportLink = link);
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            '${events.length} event berhasil ditambahkan ke Google Calendar.',
-          ),
-        ),
+        const SnackBar(content: Text('Link Google Calendar berhasil dibuat.')),
       );
     } catch (e) {
       if (!mounted) return;
@@ -212,6 +211,59 @@ class _ScheduleResultScreenState extends State<ScheduleResultScreen> {
                 ),
               ),
               const SizedBox(height: 15),
+              if (_calendarExportLink != null) ...[
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.green.shade50,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.green.shade100),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Row(
+                        children: [
+                          Icon(Icons.link, color: Colors.green),
+                          SizedBox(width: 8),
+                          Text(
+                            'Link Export Google Calendar',
+                            style: TextStyle(
+                              fontWeight: FontWeight.w700,
+                              color: Colors.green,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      SelectableText(
+                        _calendarExportLink!,
+                        style: const TextStyle(fontSize: 12),
+                      ),
+                      const SizedBox(height: 8),
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: TextButton.icon(
+                          onPressed: () {
+                            Clipboard.setData(
+                              ClipboardData(text: _calendarExportLink!),
+                            );
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Link export berhasil disalin.'),
+                              ),
+                            );
+                          },
+                          icon: const Icon(Icons.copy),
+                          label: const Text('Copy Link'),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 15),
+              ],
               // TOMBOL KEMBALI
               SizedBox(
                 width: double.infinity,
