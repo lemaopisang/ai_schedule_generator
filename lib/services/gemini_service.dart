@@ -7,7 +7,7 @@ class GeminiService {
   static const String _envVarName = 'GEMINI_API_KEY';
 
   static String get _apiKey {
-    final fromDotEnv = dotenv.env[_envVarName]?.trim();
+    final fromDotEnv = dotenv.isInitialized ? dotenv.env[_envVarName]?.trim() : null;
     if (fromDotEnv?.isNotEmpty == true) {
       return fromDotEnv!;
     }

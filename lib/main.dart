@@ -1,11 +1,28 @@
-import 'package:firebase_core/firebase_core.dart'; // import firebase_core
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 
-import 'ui/home_screen.dart';
+import 'theme/app_theme.dart';
+import 'ui/splash_screen.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Lock to portrait
+  await SystemChrome.setPreferredOrientations([
+    DeviceOrientation.portraitUp,
+    DeviceOrientation.portraitDown,
+  ]);
+
+  // Transparent status bar
+  SystemChrome.setSystemUIOverlayStyle(
+    const SystemUiOverlayStyle(
+      statusBarColor: Colors.transparent,
+      statusBarIconBrightness: Brightness.light,
+    ),
+  );
+
   try {
     await dotenv.load(fileName: '.env');
   } catch (e) {
@@ -14,8 +31,9 @@ Future<void> main() async {
   try {
     await Firebase.initializeApp();
   } catch (e) {
-    debugPrint("Firebase error: $e");
+    debugPrint('Firebase error: $e');
   }
+
   runApp(const MainApp());
 }
 
@@ -27,24 +45,10 @@ class MainApp extends StatelessWidget {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       title: 'AI Schedule Generator',
-
-      // Tema global menggunakan Material 3
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: Colors.indigo, // warna brand utama
-          brightness: Brightness.light,
-        ),
-        useMaterial3: true,
-        scaffoldBackgroundColor: Colors.grey[50],
-        appBarTheme: const AppBarTheme(
-          backgroundColor: Colors.indigo,
-          foregroundColor: Colors.white,
-          elevation: 0,
-          centerTitle: true,
-        ),
-      ),
-
-      home: const HomeScreen(), // Halaman pertama saat aplikasi dibuka
+      theme: AppTheme.light,
+      darkTheme: AppTheme.dark,
+      themeMode: ThemeMode.system,
+      home: const SplashScreen(),
     );
   }
 }

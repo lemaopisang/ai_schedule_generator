@@ -1,12 +1,16 @@
-import 'package:flutter/material.dart';
-import 'package:flutter/services.dart'; // Untuk fitur copy ke clipboard
-import 'package:flutter_markdown/flutter_markdown.dart'; // Untuk render Markdown
+﻿import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_markdown/flutter_markdown.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:share_plus/share_plus.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../services/calendar_service.dart';
 import '../services/schedule_parser.dart';
+import '../theme/app_theme.dart';
 
 class ScheduleResultScreen extends StatefulWidget {
-  final String scheduleResult; // Data hasil dari AI
+  final String scheduleResult;
   const ScheduleResultScreen({super.key, required this.scheduleResult});
 
   @override
@@ -16,7 +20,8 @@ class ScheduleResultScreen extends StatefulWidget {
 class _ScheduleResultScreenState extends State<ScheduleResultScreen> {
   final CalendarService _calendarService = CalendarService();
   bool _isExporting = false;
-  String? _calendarExportLink;
+
+  // ── DateTime picker ────────────────────────────────────────────────────────
 
   Future<DateTime?> _pickDateTime(BuildContext context) async {
     final now = DateTime.now();
@@ -26,14 +31,12 @@ class _ScheduleResultScreenState extends State<ScheduleResultScreen> {
       firstDate: DateTime(now.year - 1),
       lastDate: DateTime(now.year + 3),
     );
-
     if (pickedDate == null || !context.mounted) return null;
 
     final pickedTime = await showTimePicker(
       context: context,
       initialTime: TimeOfDay.fromDateTime(now),
     );
-
     if (pickedTime == null) return null;
 
     return DateTime(
@@ -44,6 +47,8 @@ class _ScheduleResultScreenState extends State<ScheduleResultScreen> {
       pickedTime.minute,
     );
   }
+
+  // ── Export to calendar ─────────────────────────────────────────────────────
 
   Future<void> _exportToCalendar() async {
     final anchor = await _pickDateTime(context);
@@ -58,9 +63,8 @@ class _ScheduleResultScreenState extends State<ScheduleResultScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text(
-            'Format jadwal belum berisi rentang waktu yang bisa diekspor.',
-          ),
-          backgroundColor: Colors.red,
+              'Format jadwal belum berisi rentang waktu yang bisa diekspor.'),
+          backgroundColor: Colors.redAccent,
         ),
       );
       return;
@@ -70,16 +74,13 @@ class _ScheduleResultScreenState extends State<ScheduleResultScreen> {
     try {
       final link = _calendarService.buildParsedEventsSummaryLink(events);
       if (!mounted) return;
-      setState(() => _calendarExportLink = link);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Link Google Calendar berhasil dibuat.')),
-      );
+      _showCalendarLinkSheet(link);
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Export gagal: $e'),
-          backgroundColor: Colors.red,
+          backgroundColor: Colors.redAccent,
         ),
       );
     } finally {
@@ -87,209 +88,319 @@ class _ScheduleResultScreenState extends State<ScheduleResultScreen> {
     }
   }
 
+  // ── Calendar link bottom sheet ─────────────────────────────────────────────
+
+  void _showCalendarLinkSheet(String link) {
+    final cs = Theme.of(context).colorScheme;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => Container(
+        decoration: BoxDecoration(
+          color: cs.surface,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        padding: EdgeInsets.fromLTRB(
+            24, 12, 24, 24 + MediaQuery.of(context).viewInsets.bottom),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Handle
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: cs.outlineVariant,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.green.withAlpha(30),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(Icons.calendar_month_rounded,
+                      color: Colors.green, size: 20),
+                ),
+                const SizedBox(width: 12),
+                Text(
+                  'Link Google Calendar',
+                  style: GoogleFonts.poppins(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                      color: cs.onSurface),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: cs.surfaceContainerHighest,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: SelectableText(
+                link,
+                style: GoogleFonts.inter(fontSize: 11, height: 1.5),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                // Copy
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () {
+                      Clipboard.setData(ClipboardData(text: link));
+                      Navigator.of(context).pop();
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Link berhasil disalin.'),
+                        ),
+                      );
+                    },
+                    icon: const Icon(Icons.copy_rounded, size: 16),
+                    label: const Text('Salin'),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                // Open
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: () async {
+                      final uri = Uri.parse(link);
+                      if (await canLaunchUrl(uri)) {
+                        await launchUrl(uri,
+                            mode: LaunchMode.externalApplication);
+                      }
+                    },
+                    icon: const Icon(Icons.open_in_new_rounded, size: 16),
+                    label: const Text('Buka'),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ── Share ──────────────────────────────────────────────────────────────────
+
+  void _shareSchedule() {
+    Share.share(
+      widget.scheduleResult,
+      subject: 'Jadwal AI Schedule Generator',
+    );
+  }
+
+  // ── Build ──────────────────────────────────────────────────────────────────
+
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Scaffold(
-      backgroundColor: Colors.grey[50],
-      // APP BAR + COPY BUTTON
-      appBar: AppBar(
-        title: const Text("Hasil Jadwal Optimal"),
-        actions: [
-          IconButton(
-            icon: _isExporting
-                ? const SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: Colors.white,
-                    ),
-                  )
-                : const Icon(Icons.calendar_month),
-            tooltip: "Export ke Google Calendar",
-            onPressed: _isExporting ? null : _exportToCalendar,
-          ),
-          IconButton(
-            icon: const Icon(Icons.copy),
-            tooltip: "Salin Jadwal",
-            onPressed: () {
-              // Menyalin seluruh hasil ke clipboard
-              Clipboard.setData(ClipboardData(text: widget.scheduleResult));
-              // Notifikasi kecil ke user
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text("Jadwal berhasil disalin!")),
-              );
-            },
-          ),
-        ],
-      ),
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Column(
-            children: [
-              // HEADER INFORMASI
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  vertical: 10,
-                  horizontal: 15,
+      body: CustomScrollView(
+        slivers: [
+          // ── Gradient SliverAppBar ─────────────────────────────
+          SliverAppBar(
+            pinned: true,
+            expandedHeight: 100,
+            leading: IconButton(
+              icon: const Icon(Icons.arrow_back_ios_new_rounded,
+                  color: Colors.white),
+              onPressed: () => Navigator.pop(context),
+            ),
+            actions: [
+              IconButton(
+                icon: const Icon(Icons.share_rounded, color: Colors.white),
+                tooltip: 'Bagikan Jadwal',
+                onPressed: _shareSchedule,
+              ),
+              IconButton(
+                icon: const Icon(Icons.copy_rounded, color: Colors.white),
+                tooltip: 'Salin Semua',
+                onPressed: () {
+                  Clipboard.setData(
+                      ClipboardData(text: widget.scheduleResult));
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                        content: Text('Jadwal berhasil disalin!')),
+                  );
+                },
+              ),
+            ],
+            flexibleSpace: FlexibleSpaceBar(
+              titlePadding:
+                  const EdgeInsets.only(left: 56, bottom: 14, right: 20),
+              title: Text(
+                'Hasil Jadwal',
+                style: GoogleFonts.poppins(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                  color: Colors.white,
                 ),
+              ),
+              background: Container(
+                decoration:
+                    const BoxDecoration(gradient: AppTheme.brandGradient),
+              ),
+            ),
+          ),
+
+          // ── AI banner ─────────────────────────────────────────
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 16, vertical: 12),
                 decoration: BoxDecoration(
-                  color: Colors.indigo.shade50,
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.indigo.shade100),
+                  gradient: LinearGradient(colors: [
+                    cs.primaryContainer,
+                    cs.primaryContainer.withAlpha(150),
+                  ]),
+                  borderRadius: BorderRadius.circular(12),
                 ),
                 child: Row(
-                  children: const [
-                    Icon(Icons.auto_awesome, color: Colors.indigo),
-                    SizedBox(width: 10),
+                  children: [
+                    Icon(Icons.auto_awesome_rounded,
+                        color: cs.onPrimaryContainer, size: 18),
+                    const SizedBox(width: 10),
                     Expanded(
                       child: Text(
-                        "Jadwal ini disusun otomatis oleh AI berdasarkan prioritas Anda.",
-                        style: TextStyle(color: Colors.indigo, fontSize: 13),
+                        'Jadwal ini disusun otomatis oleh AI berdasarkan prioritas Anda.',
+                        style: GoogleFonts.inter(
+                          fontSize: 12,
+                          color: cs.onPrimaryContainer,
+                          height: 1.4,
+                        ),
                       ),
                     ),
                   ],
                 ),
               ),
-              const SizedBox(height: 15),
-              // AREA HASIL (MARKDOWN)
-              Expanded(
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(12),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withAlpha((0.05 * 255).round()),
-                        blurRadius: 10,
-                        offset: const Offset(0, 4),
+            ),
+          ),
+
+          // ── Markdown result ───────────────────────────────────
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+              child: Container(
+                decoration: BoxDecoration(
+                  color: isDark
+                      ? const Color(0xFF1A2B3C)
+                      : Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: [
+                    BoxShadow(
+                      color: cs.shadow.withAlpha(20),
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(16),
+                  child: MarkdownBody(
+                    data: widget.scheduleResult,
+                    selectable: true,
+                    styleSheet: MarkdownStyleSheet(
+                      p: GoogleFonts.inter(
+                        fontSize: 14,
+                        height: 1.6,
+                        color: cs.onSurface,
                       ),
-                    ],
-                  ),
-                  // Markdown otomatis memiliki scroll
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(12),
-                    child: Markdown(
-                      data: widget.scheduleResult, // Data dari AI
-                      selectable: true, // Bisa copy sebagian teks
-                      padding: const EdgeInsets.all(20),
-                      // Styling agar tampilan lebih profesional
-                      styleSheet: MarkdownStyleSheet(
-                        p: const TextStyle(
-                          fontSize: 15,
-                          height: 1.6,
-                          color: Colors.black87,
-                        ),
-                        // Styling heading
-                        h1: const TextStyle(
-                          fontSize: 24,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.indigo,
-                        ),
-                        h2: const TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                        ),
-                        h3: const TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.indigoAccent,
-                        ),
-                        // Styling tabel
-                        tableBorder: TableBorder.all(
-                          color: Colors.grey,
-                          width: 1,
-                        ),
-                        tableHeadAlign: TextAlign.center,
-                        tablePadding: const EdgeInsets.all(8),
+                      h1: GoogleFonts.poppins(
+                        fontSize: 22,
+                        fontWeight: FontWeight.w700,
+                        color: cs.primary,
                       ),
-                      // Custom builder (opsional/advanced)
-                      builders: {'table': TableBuilder()},
+                      h2: GoogleFonts.poppins(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700,
+                        color: cs.onSurface,
+                      ),
+                      h3: GoogleFonts.poppins(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                        color: cs.primary,
+                      ),
+                      strong: GoogleFonts.inter(
+                        fontWeight: FontWeight.w700,
+                        color: cs.onSurface,
+                      ),
+                      blockquoteDecoration: BoxDecoration(
+                        color: cs.primaryContainer.withAlpha(120),
+                        border: Border(
+                            left: BorderSide(
+                                color: cs.primary, width: 3)),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      tableBorder: TableBorder.all(
+                        color: cs.outlineVariant,
+                        width: 1,
+                      ),
+                      tableHeadAlign: TextAlign.center,
                     ),
                   ),
                 ),
               ),
-              const SizedBox(height: 15),
-              if (_calendarExportLink != null) ...[
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Colors.green.shade50,
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.green.shade100),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Row(
-                        children: [
-                          Icon(Icons.link, color: Colors.green),
-                          SizedBox(width: 8),
-                          Text(
-                            'Link Export Google Calendar',
-                            style: TextStyle(
-                              fontWeight: FontWeight.w700,
-                              color: Colors.green,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-                      SelectableText(
-                        _calendarExportLink!,
-                        style: const TextStyle(fontSize: 12),
-                      ),
-                      const SizedBox(height: 8),
-                      Align(
-                        alignment: Alignment.centerRight,
-                        child: TextButton.icon(
-                          onPressed: () {
-                            Clipboard.setData(
-                              ClipboardData(text: _calendarExportLink!),
-                            );
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('Link export berhasil disalin.'),
-                              ),
-                            );
-                          },
-                          icon: const Icon(Icons.copy),
-                          label: const Text('Copy Link'),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 15),
-              ],
-              // TOMBOL KEMBALI
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton.icon(
-                  onPressed: () => Navigator.pop(context),
-                  icon: const Icon(Icons.refresh),
-                  label: const Text("Buat Jadwal Baru"),
-                ),
-              ),
-            ],
+            ),
           ),
-        ),
+
+          // ── Bottom actions ────────────────────────────────────
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
+              child: Row(
+                children: [
+                  // Export to Calendar
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: _isExporting ? null : _exportToCalendar,
+                      icon: _isExporting
+                          ? const SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(
+                                  strokeWidth: 2),
+                            )
+                          : const Icon(Icons.calendar_month_rounded,
+                              size: 16),
+                      label: Text(
+                          _isExporting ? 'Memproses...' : 'Google Calendar'),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  // Back
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: () => Navigator.pop(context),
+                      icon: const Icon(Icons.refresh_rounded, size: 16),
+                      label: const Text('Buat Baru'),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
       ),
     );
-  }
-}
-
-class TableBuilder extends MarkdownElementBuilder {
-  @override
-  Widget? visitElementAfterWithContext(
-    BuildContext context,
-    dynamic element,
-    TextStyle? preferredStyle,
-    TextStyle? parentStyle,
-  ) {
-    // Menggunakan render default (tidak diubah)
-    return null;
   }
 }

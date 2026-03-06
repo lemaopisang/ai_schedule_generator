@@ -4,7 +4,7 @@ Aplikasi Flutter untuk membuat jadwal harian dari daftar tugas menggunakan Gemin
 
 ## Setup
 
-1. Buat/isi file `.env` di root project:
+1. Salin file `.env.example` jadi `.env`, isi key kamu, dan pastikan `.env` tetap di-ignore (tidak di-commit):
 
 	`GEMINI_API_KEY=YOUR_GEMINI_API_KEY`
 
@@ -33,7 +33,15 @@ Aplikasi Flutter untuk membuat jadwal harian dari daftar tugas menggunakan Gemin
 ## Catatan Keamanan
 
 - Jangan commit `.env` ke repository.
-- API key di client app tetap bisa terekspos pada build production; untuk production, gunakan backend proxy.
+- Simpan key di secret manager (CI/CD secret, backend proxy, dll) saat build/release. CI di repo ini sudah menggunakan secret `AI_API_KEY` untuk menjalankan `flutter build`.
+
+## CI/CD (GitHub Actions)
+
+- Workflow `/.github/workflows/flutter-ci.yml` berjalan pada push/pull request ke `main`.
+- Ia menggunakan cache untuk `~/.pub-cache` dan `.dart_tool`, lalu menjalankan `flutter pub get`, `flutter analyze`, dan `flutter test`.
+- Setelah lulus check, workflow membangun `flutter build apk --release` dan `flutter build web` dengan `--dart-define=GEMINI_API_KEY=${{ secrets.AI_API_KEY }}`.
+- Kedua hasil build diunggah sebagai artifact: `release-apk` dan `web-release`.
+- Tambahkan secret `AI_API_KEY` di GitHub repo settings agar CI bisa menyuntikkan key tanpa menaruhnya di repo.
 
 ## Legal
 
